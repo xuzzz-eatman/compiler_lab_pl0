@@ -26,8 +26,15 @@ void error(int n)
 } // error
 
 //////////////////////////////////////////////////////////////////////
+//获取字符 先读入一行到line[]中 再逐个字符读取
 void getch(void)
 {
+	if(line[cc+1]=='/'&&line[cc+2]=='/')
+	{	
+		line[cc+1]=' ';
+		line[cc+2]=' ';
+		cc=ll;
+	} //添加行注释 by徐卓
 	if (cc == ll)
 	{
 		if (feof(infile))
@@ -46,6 +53,7 @@ void getch(void)
 		printf("\n");
 		line[++ll] = ' ';
 	}
+	
 	ch = line[++cc];
 } // getch
 
@@ -58,7 +66,25 @@ void getsym(void)
 
 	while (ch == ' '||ch == '\t')
 		getch();
-
+	if (ch=='/'){ //处理块注释 by徐卓
+		getch();
+		if(ch=='*'){
+			getch();
+			while(ch!='*'){
+				getch();
+			}
+			getch();
+			if(ch == '/')
+				getch();
+			else
+				error(34);			
+		}
+		else{
+			error(33);
+		}
+	}
+	while (ch == ' '||ch == '\t')
+		getch();
 	if (isalpha(ch))
 	{ // symbol is a reserved word or an identifier.
 		k = 0;
@@ -69,15 +95,23 @@ void getsym(void)
 			getch();
 		}
 		while (isalpha(ch) || isdigit(ch));
-		a[k] = 0;
-		strcpy(id, a);
-		word[0] = id;
-		i = NRW;
-		while (strcmp(id, word[i--]));
-		if (++i)
-			sym = wsym[i]; // symbol is a reserved word
-		else
-			sym = SYM_IDENTIFIER;   // symbol is an identifier
+		if(ch==':'&&line[cc+1]!='='){
+			getch();
+			a[k] = 0;
+			strcpy(id, a);
+			sym = SYM_LABEL;    //对label的识别 GOTO会使用到 modify by 徐卓
+		}
+		else{
+			a[k] = 0;
+			strcpy(id, a);
+			word[0] = id;
+			i = NRW;
+			while (strcmp(id, word[i--]));
+			if (++i)
+				sym = wsym[i]; // symbol is a reserved word
+			else
+				sym = SYM_IDENTIFIER;   // symbol is an identifier
+		}	
 	}
 	else if (isdigit(ch))
 	{ // symbol is a number.
@@ -215,6 +249,11 @@ void enter(int kind)
 		mk = (mask*) &table[tx];
 		mk->level = level;
 		break;
+	case ID_LABEL:
+		mk = (mask*) &table[tx];
+		mk->level = level;
+		table[tx].value = cx;
+		break;   // 添加label类型的ID 为goto提供信息 徐卓
 	} // switch
 } // enter
 
@@ -227,9 +266,10 @@ int position(char* id)
 	i = tx + 1;
 	while (strcmp(table[--i].name, id) != 0);
 	return i;
-} // position
+} // position   没找到为0
 
 //////////////////////////////////////////////////////////////////////
+//常值变量声明
 void constdeclaration()
 {
 	if (sym == SYM_IDENTIFIER)
@@ -259,6 +299,7 @@ void constdeclaration()
 } // constdeclaration
 
 //////////////////////////////////////////////////////////////////////
+//普通变量声明
 void vardeclaration(void)
 {
 	if (sym == SYM_IDENTIFIER)
@@ -273,6 +314,7 @@ void vardeclaration(void)
 } // vardeclaration
 
 //////////////////////////////////////////////////////////////////////
+
 void listcode(int from, int to)
 {
 	int i;
@@ -464,8 +506,12 @@ void statement(symset fsys)
 {
 	int i, cx1, cx2;
 	symset set1, set;
-
-	if (sym == SYM_IDENTIFIER)
+	if(sym==SYM_LABEL){
+		enter(ID_LABEL);
+		getsym();
+		statement(fsys);
+	}  //识别label by徐卓
+	else if (sym == SYM_IDENTIFIER)
 	{ // variable assignment
 		mask* mk;
 		if (! (i = position(id)))
@@ -538,7 +584,25 @@ void statement(symset fsys)
 		cx1 = cx;
 		gen(JPC, 0, 0);
 		statement(fsys);
-		code[cx1].a = cx;	
+		 //填入JPC的地址
+		if(sym == SYM_ELSE)   //else 添加 by徐卓
+		{	
+			cx2 = cx;
+			gen(JMP,0,0);
+			code[cx1].a = cx;
+			getsym();
+			statement(fsys);
+			code[cx2].a = cx; //回填JMP地址
+			
+		}
+		else
+		{
+			code[cx1].a = cx;
+		}		// 不存在else  即单独一个if then
+		
+
+		
+			
 	}
 	else if (sym == SYM_BEGIN)
 	{ // block
@@ -592,11 +656,37 @@ void statement(symset fsys)
 		gen(JMP, 0, cx1);
 		code[cx2].a = cx;
 	}
+	else if(sym==SYM_GOTO) //goto的实现 by徐卓
+	{
+		getsym();
+		if(sym!=SYM_IDENTIFIER)
+		{
+			error(35); //There must be an label to follow the goto
+		}
+		else
+		{
+			if (! (i = position(id)))
+			{
+				error(11); // Undeclared identifier or label.
+			}
+			else if (table[i].kind == ID_LABEL)
+			{
+				gen(JMP, 0, table[i].value);
+			}
+			else
+			{
+				error(36); // A constant or variable or label can not be goto
+			}
+			getsym();
+		}
+		
+		
+	}
 	test(fsys, phi, 19);
 } // statement
 			
 //////////////////////////////////////////////////////////////////////
-void block(symset fsys)
+void block(symset fsys)//程序体
 {
 	int cx0; // initial code index
 	mask* mk;
@@ -732,6 +822,7 @@ void block(symset fsys)
 } // block
 
 //////////////////////////////////////////////////////////////////////
+//沿静态链查找
 int base(int stack[], int currentLevel, int levelDiff)
 {
 	int b = currentLevel;
@@ -882,7 +973,7 @@ void main ()
 	
 	// create begin symbol sets
 	declbegsys = createset(SYM_CONST, SYM_VAR, SYM_PROCEDURE, SYM_NULL);
-	statbegsys = createset(SYM_BEGIN, SYM_CALL, SYM_IF, SYM_WHILE, SYM_NULL);
+	statbegsys = createset(SYM_BEGIN, SYM_CALL, SYM_IF, SYM_WHILE,SYM_GOTO, SYM_NULL);//添加了GOTO by 徐卓
 	facbegsys = createset(SYM_IDENTIFIER, SYM_NUMBER, SYM_LPAREN, SYM_MINUS, SYM_NULL);
 
 	err = cc = cx = ll = 0; // initialize global variables

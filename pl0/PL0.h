@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#define NRW        11     // number of reserved words
+#define NRW        11+2     // number of reserved words  徐卓+2
 #define TXMAX      500    // length of identifier table
 #define MAXNUMLEN  14     // maximum number of digits in numbers
 #define NSYM       10     // maximum number of symbols in array ssym and csym
@@ -18,6 +18,7 @@ enum symtype
 {
 	SYM_NULL,
 	SYM_IDENTIFIER,
+	SYM_LABEL, // modify by 徐卓
 	SYM_NUMBER,
 	SYM_PLUS,
 	SYM_MINUS,
@@ -45,12 +46,14 @@ enum symtype
 	SYM_CALL,
 	SYM_CONST,
 	SYM_VAR,
-	SYM_PROCEDURE
+	SYM_PROCEDURE,
+	SYM_GOTO,   //徐卓
+	SYM_ELSE,	//徐卓
 };
 
 enum idtype
 {
-	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE
+	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE, ID_LABEL
 };
 
 enum opcode
@@ -88,11 +91,11 @@ char* err_msg[] =
 /*  8 */    "Follow the statement is an incorrect symbol.",
 /*  9 */    "'.' expected.",
 /* 10 */    "';' expected.",
-/* 11 */    "Undeclared identifier.",
+/* 11 */    "Undeclared identifier or labe.",
 /* 12 */    "Illegal assignment.",
 /* 13 */    "':=' expected.",
 /* 14 */    "There must be an identifier to follow the 'call'.",
-/* 15 */    "A constant or variable can not be called.",
+/* 15 */    "A constant or variable or label can not be called.",
 /* 16 */    "'then' expected.",
 /* 17 */    "';' or 'end' expected.",
 /* 18 */    "'do' expected.",
@@ -109,7 +112,11 @@ char* err_msg[] =
 /* 29 */    "",
 /* 30 */    "",
 /* 31 */    "",
-/* 32 */    "There are too many levels."
+/* 32 */    "There are too many levels.",
+/* 33 */    "The symbol '*' is expected  ", //注释错误提示
+/* 34 */    "The symbol '/' is expected  " ,
+/* 35 */    "There must be an label to follow the goto",  //goto的错误提示
+/* 36 */	"A constant or variable or label can not be goto."
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -133,13 +140,13 @@ char* word[NRW + 1] =
 {
 	"", /* place holder */
 	"begin", "call", "const", "do", "end","if",
-	"odd", "procedure", "then", "var", "while"
+	"odd", "procedure", "then", "var", "while", "goto", "else" //徐卓添加goto else
 };
 
 int wsym[NRW + 1] =
 {
 	SYM_NULL, SYM_BEGIN, SYM_CALL, SYM_CONST, SYM_DO, SYM_END,
-	SYM_IF, SYM_ODD, SYM_PROCEDURE, SYM_THEN, SYM_VAR, SYM_WHILE
+	SYM_IF, SYM_ODD, SYM_PROCEDURE, SYM_THEN, SYM_VAR, SYM_WHILE, SYM_GOTO ,SYM_ELSE //徐卓添加
 };
 
 int ssym[NSYM + 1] =
