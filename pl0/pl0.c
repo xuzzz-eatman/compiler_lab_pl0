@@ -504,10 +504,19 @@ void condition(symset fsys)
 //////////////////////////////////////////////////////////////////////
 void statement(symset fsys)
 {
-	int i, cx1, cx2;
+	int i, cx1, cx2, tmp;
 	symset set1, set;
 	if(sym==SYM_LABEL){
-		enter(ID_LABEL);
+		if(! (i = position(id)))
+		{
+			enter(ID_LABEL);
+		}
+		else
+		{
+			code[table[i].value].a=cx;
+			table[i].value=cx;     //修改之前的jmp的地址  GOTO by徐卓
+		}
+		
 		getsym();
 		statement(fsys);
 	}  //识别label by徐卓
@@ -656,7 +665,7 @@ void statement(symset fsys)
 		gen(JMP, 0, cx1);
 		code[cx2].a = cx;
 	}
-	else if(sym==SYM_GOTO) //goto的实现 by徐卓
+	else if (sym==SYM_GOTO) //goto的实现 by徐卓
 	{
 		getsym();
 		if(sym!=SYM_IDENTIFIER)
@@ -667,11 +676,19 @@ void statement(symset fsys)
 		{
 			if (! (i = position(id)))
 			{
-				error(11); // Undeclared identifier or label.
+				enter(ID_LABEL);
+				gen(JMP,0,-1);   //先出现goto 后面才出现label暂时填-1,表示label未出现  by徐卓
 			}
 			else if (table[i].kind == ID_LABEL)
 			{
-				gen(JMP, 0, table[i].value);
+				if(code[table[i].value].f == JMP && code[table[i].value].a == -1)
+				{
+					code[table[i].value].a = cx;
+					table[i].value = cx;
+					gen(JMP, 0, -1);    //依然未出现label 但之前出现了GOTO,使上一个GOTO到下一个GOTO by徐卓
+				}
+				else
+					gen(JMP, 0, table[i].value);
 			}
 			else
 			{
