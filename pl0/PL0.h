@@ -116,7 +116,8 @@ char* err_msg[] =
 /* 33 */    "The symbol '*' is expected  ", //注释错误提示
 /* 34 */    "The symbol '/' is expected  " ,
 /* 35 */    "There must be an label to follow the goto",  //goto的错误提示
-/* 36 */	"A constant or variable or label can not be goto."
+/* 36 */	"A constant or variable or label can not be goto.",
+/* 37 */	"There already exists this label. " //重复定义label 
 };
 
 //////////////////////////////////////////////////////////////////////

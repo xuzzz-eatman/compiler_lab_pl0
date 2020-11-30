@@ -512,9 +512,17 @@ void statement(symset fsys)
 			enter(ID_LABEL);
 		}
 		else
-		{
-			code[table[i].value].a=cx;
-			table[i].value=cx;     //修改之前的jmp的地址  GOTO by徐卓
+		{	if(code[table[i].value].f == JMP && code[table[i].value].a == -1)
+			{
+				code[table[i].value].a=cx;
+				table[i].value=cx;     //修改之前的jmp的地址  GOTO by徐卓
+			}
+			else
+			{
+				error(37); //重复定义label by徐卓
+			}
+			
+
 		}
 		
 		getsym();
