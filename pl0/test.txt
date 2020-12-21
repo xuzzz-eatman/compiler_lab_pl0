@@ -1,0 +1,9 @@
+procedure test(i,s);
+var i, j;
+begin
+i:=2;
+j:=3;
+end;
+begin
+call test;
+end.

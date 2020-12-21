@@ -1,0 +1,13 @@
+var i;
+procedure p;
+var i;
+begin
+  i := 2;
+end;
+procedure q;
+begin
+  i := i + 1;
+end;
+begin
+  i:=i+2;
+end.

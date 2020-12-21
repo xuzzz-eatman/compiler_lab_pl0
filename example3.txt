@@ -1,0 +1,14 @@
+var i;
+procedure p;
+procedure q;
+begin
+  i := i + 1;
+end;
+begin
+  i := 2;
+  call q;
+end;
+begin
+  i := 1;
+  call p;
+end.
