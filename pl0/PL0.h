@@ -11,7 +11,6 @@
 #define CXMAX      500    // size of code array
 
 #define MAXSYM     30     // maximum number of symbols  
-
 #define STACKSIZE  1000   // maximum storage
 
 enum symtype
@@ -117,7 +116,11 @@ char* err_msg[] =
 /* 34 */    "The symbol '/' is expected  " ,
 /* 35 */    "There must be an label to follow the goto",  //goto的错误提示
 /* 36 */	"A constant or variable or label can not be goto.",
-/* 37 */	"There already exists this label. " //重复定义label 
+/* 37 */    "There is a nested procedure",
+/* 38 */    "The procedure name must be followed by ()",
+/* 39 */    "The procedure expects a parameter but other words appear",
+/* 40 */    "The procedure loses a parameter or has an extra ','"
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -132,7 +135,7 @@ int  err;		 //err数量
 int  cx;         // index of current instruction to be generated.
 int  level = 0;
 int  tx = 0;	// id table ++
-
+int in_procedure = 0;//in a procedure or not
 char line[80];
 
 instruction code[CXMAX];
