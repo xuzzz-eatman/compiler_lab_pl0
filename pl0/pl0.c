@@ -131,6 +131,38 @@ void getsym(void)
 		if (k > MAXNUMLEN)
 			error(25); // The number is too great.
 	}
+	else if (ch == '&' && line[cc+1] != '&')
+	{
+		getch();
+		if(isalpha(ch))
+		{	// symbol is a quoteidentifier.
+			k = 0;
+			do
+			{
+				if (k < MAXIDLEN)
+					a[k++] = ch;
+				getch();
+			} while (isalpha(ch) || isdigit(ch));
+			if(ch == '=')
+			{
+				a[k] = 0;
+				strcpy(id, a);
+				word[0] = id;
+				i = NRW;
+				while (strcmp(id, word[i--]))
+					;
+				if (++i)
+					error(11); // symbol is a reserved word  error
+				else
+					sym = SYM_QUOTEIDENTIFIER; // symbol is a quoteidentifier
+			}
+			else
+			{
+				error(11);
+			}
+			
+		}
+	}
 	else if (ch == ':')
 	{
 		getch();
@@ -255,10 +287,13 @@ void enter(int kind)
 		mk->level = level;
 		break;
 	case ID_LABEL:
-		mk = (mask *)&table[tx];
-		mk->level = level;
 		table[tx].value = cx;
 		break; // 添加label类型的ID 为goto提供信息 徐卓
+	case ID_QUOTEVARIABLE:
+		mk = (mask *)&table[tx];
+		mk->level = level;
+		mk->address = dx++;	
+		break;	
 	}		   // switch
 } // enter
 
@@ -315,6 +350,26 @@ void vardeclaration(void)
 		enter(ID_VARIABLE);
 		getsym();
 	}
+	else if(sym == SYM_QUOTEIDENTIFIER)
+	{
+		int i;
+		mask *mk;
+		enter(ID_QUOTEVARIABLE);
+		getch();
+		getsym(); 
+		if(!(i = position(id)))
+		{
+			error(11);  //引用的变量未声明
+		}
+		else
+		{
+			mk=(mask *)&table[i];
+			gen(LEA,level,mk->address);
+			mk=(mask *)&table[tx];
+			gen(STO,level,mk->address);
+		}
+		
+	}
 	else
 	{
 		error(4); // There must be an identifier to follow 'const', 'var', or 'procedure'.
@@ -363,6 +418,11 @@ void factor(symset fsys)
 				case ID_VARIABLE:
 					mk = (mask *)&table[i];
 					gen(LOD, level - mk->level, mk->address);
+					break;
+				case ID_QUOTEVARIABLE:
+					mk = (mask *)&table[i];
+					gen(LOD, level - mk->level, mk->address);
+					gen(LODA, 0, 0);
 					break;
 				case ID_PROCEDURE:
 					error(21); // Procedure identifier can not be in an expression.
@@ -520,6 +580,7 @@ void statement(symset fsys)
 		getsym();
 		statement(fsys);
 	} //识别label by徐卓
+
 	else if (sym == SYM_IDENTIFIER)
 	{ // variable assignment
 		mask *mk;
@@ -527,7 +588,7 @@ void statement(symset fsys)
 		{
 			error(11); // Undeclared identifier.
 		}
-		else if (table[i].kind != ID_VARIABLE)
+		else if (table[i].kind != ID_VARIABLE && table[i].kind != ID_QUOTEVARIABLE)
 		{
 			error(12); // Illegal assignment.
 			i = 0;
@@ -541,12 +602,19 @@ void statement(symset fsys)
 		{
 			error(13); // ':=' expected.
 		}
+		if(table[i].kind == ID_QUOTEVARIABLE)
+			gen(LOD,level - mk->level,mk->address);
 		expression(fsys);
 		mk = (mask *)&table[i];
-		if (i)
+		if (i&&table[i].kind == ID_VARIABLE)
 		{
 			gen(STO, level - mk->level, mk->address);
 		}
+		else if (i&&table[i].kind == ID_QUOTEVARIABLE)
+		{
+			gen(STOA,0,0);
+		}
+		
 	}
 	else if (sym == SYM_CALL)
 	{ // procedure call

@@ -17,6 +17,7 @@ enum symtype
 {
 	SYM_NULL,
 	SYM_IDENTIFIER,
+	SYM_QUOTEIDENTIFIER, // modify by 徐卓
 	SYM_LABEL, // modify by 徐卓
 	SYM_NUMBER,
 	SYM_PLUS,
@@ -52,13 +53,13 @@ enum symtype
 
 enum idtype
 {
-	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE, ID_LABEL
+	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE, ID_LABEL, ID_QUOTEVARIABLE
 };
 
 enum opcode
 {
-	LIT, OPR, LOD, STO, CAL, INT, JMP, JPC
-};
+	LIT, OPR, LOD, STO, CAL, INT, JMP, JPC, LEA, LODA, STOA
+};											//XUZZZ
 
 enum oprcode
 {
@@ -164,10 +165,10 @@ char csym[NSYM + 1] =
 	' ', '+', '-', '*', '/', '(', ')', '=', ',', '.', ';'
 };
 
-#define MAXINS   8
+#define MAXINS   8+3 //xuzzz
 char* mnemonic[MAXINS] =
 {
-	"LIT", "OPR", "LOD", "STO", "CAL", "INT", "JMP", "JPC"
+	"LIT", "OPR", "LOD", "STO", "CAL", "INT", "JMP", "JPC", "LEA", "LODA", "STOA"
 };
 
 typedef struct
