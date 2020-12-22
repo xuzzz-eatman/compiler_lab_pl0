@@ -135,7 +135,7 @@ void getsym(void)
 	{
 		getch();
 		if(isalpha(ch))
-		{	// symbol is a quoteidentifier.
+		{	// symbol is a REFERidentifier.
 			k = 0;
 			do
 			{
@@ -154,7 +154,7 @@ void getsym(void)
 				if (++i)
 					error(11); // symbol is a reserved word  error
 				else
-					sym = SYM_QUOTEIDENTIFIER; // symbol is a quoteidentifier
+					sym = SYM_REFERIDENTIFIER; // symbol is a REFERidentifier
 			}
 			else
 			{
@@ -289,7 +289,7 @@ void enter(int kind)
 	case ID_LABEL:
 		table[tx].value = cx;
 		break; // 添加label类型的ID 为goto提供信息 徐卓
-	case ID_QUOTEVARIABLE:
+	case ID_REFERVARIABLE:
 		mk = (mask *)&table[tx];
 		mk->level = level;
 		mk->address = dx++;	
@@ -350,11 +350,11 @@ void vardeclaration(void)
 		enter(ID_VARIABLE);
 		getsym();
 	}
-	else if(sym == SYM_QUOTEIDENTIFIER)
+	else if(sym == SYM_REFERIDENTIFIER)
 	{
 		int i;
 		mask *mk;
-		enter(ID_QUOTEVARIABLE);
+		enter(ID_REFERVARIABLE);
 		getch();
 		getsym(); 
 		if(!(i = position(id)))
@@ -367,7 +367,7 @@ void vardeclaration(void)
 			gen(LEA,level,mk->address);
 			mk=(mask *)&table[tx];
 			gen(STO,level,mk->address);
-			num_quote++;
+			num_reference++;
 		}
 		getsym(); 
 	}
@@ -420,7 +420,7 @@ void factor(symset fsys)
 					mk = (mask *)&table[i];
 					gen(LOD, level - mk->level, mk->address);
 					break;
-				case ID_QUOTEVARIABLE:
+				case ID_REFERVARIABLE:
 					mk = (mask *)&table[i];
 					gen(LOD, level - mk->level, mk->address);
 					gen(LODA, 0, 0);
@@ -589,7 +589,7 @@ void statement(symset fsys)
 		{
 			error(11); // Undeclared identifier.
 		}
-		else if (table[i].kind != ID_VARIABLE && table[i].kind != ID_QUOTEVARIABLE)
+		else if (table[i].kind != ID_VARIABLE && table[i].kind != ID_REFERVARIABLE)
 		{
 			error(12); // Illegal assignment.
 			i = 0;
@@ -604,7 +604,7 @@ void statement(symset fsys)
 			error(13); // ':=' expected.
 		}
 		mk = (mask *)&table[i];
-		if(table[i].kind == ID_QUOTEVARIABLE)
+		if(table[i].kind == ID_REFERVARIABLE)
 			gen(LOD,level - mk->level,mk->address);
 		expression(fsys);
 		mk = (mask *)&table[i];
@@ -612,7 +612,7 @@ void statement(symset fsys)
 		{			
 			gen(STO, level - mk->level, mk->address);
 		}
-		else if (i&&table[i].kind == ID_QUOTEVARIABLE)
+		else if (i&&table[i].kind == ID_REFERVARIABLE)
 		{
 			gen(STOA,0,0);
 		}
@@ -917,8 +917,8 @@ void block(symset fsys) //程序体
 		destroyset(set);
 	} while (inset(sym, declbegsys));
 
-	code[mk->address].a = cx - 2 * num_quote;  //需要修改 cx 
-	num_quote = 0;
+	code[mk->address].a = cx - 2 * num_reference;  //需要修改 cx 
+	num_reference = 0;
 	mk->address = cx;
 	cx0 = cx;
 	gen(INT, 0, block_dx);

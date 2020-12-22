@@ -17,7 +17,7 @@ enum symtype
 {
 	SYM_NULL,
 	SYM_IDENTIFIER,
-	SYM_QUOTEIDENTIFIER, // modify by 徐卓
+	SYM_REFERIDENTIFIER, // modify by 徐卓
 	SYM_LABEL, // modify by 徐卓
 	SYM_NUMBER,
 	SYM_PLUS,
@@ -53,7 +53,7 @@ enum symtype
 
 enum idtype
 {
-	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE, ID_LABEL, ID_QUOTEVARIABLE
+	ID_CONSTANT, ID_VARIABLE, ID_PROCEDURE, ID_LABEL, ID_REFERVARIABLE
 };
 
 enum opcode
@@ -136,10 +136,9 @@ int  err;		 //err数量
 int  cx;         // index of current instruction to be generated.
 int  level = 0;
 int  tx = 0;	// id table ++
-int  num_quote=0; //引用变量数
+int  num_reference=0; //引用变量数
 int in_procedure = 0;//in a procedure or not
 char line[80];
-
 instruction code[CXMAX];
 
 char* word[NRW + 1] =
