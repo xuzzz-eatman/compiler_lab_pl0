@@ -91,7 +91,7 @@ char* err_msg[] =
 /*  8 */    "Follow the statement is an incorrect symbol.",
 /*  9 */    "'.' expected.",
 /* 10 */    "';' expected.",
-/* 11 */    "Undeclared identifier or labe.",
+/* 11 */    "Undeclared identifier or label.",
 /* 12 */    "Illegal assignment.",
 /* 13 */    "':=' expected.",
 /* 14 */    "There must be an identifier to follow the 'call'.",
@@ -136,6 +136,7 @@ int  err;		 //err数量
 int  cx;         // index of current instruction to be generated.
 int  level = 0;
 int  tx = 0;	// id table ++
+int  num_quote=0; //引用变量数
 int in_procedure = 0;//in a procedure or not
 char line[80];
 

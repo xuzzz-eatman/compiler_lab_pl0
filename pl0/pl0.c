@@ -367,8 +367,9 @@ void vardeclaration(void)
 			gen(LEA,level,mk->address);
 			mk=(mask *)&table[tx];
 			gen(STO,level,mk->address);
+			num_quote++;
 		}
-		
+		getsym(); 
 	}
 	else
 	{
@@ -602,12 +603,13 @@ void statement(symset fsys)
 		{
 			error(13); // ':=' expected.
 		}
+		mk = (mask *)&table[i];
 		if(table[i].kind == ID_QUOTEVARIABLE)
 			gen(LOD,level - mk->level,mk->address);
 		expression(fsys);
 		mk = (mask *)&table[i];
 		if (i&&table[i].kind == ID_VARIABLE)
-		{
+		{			
 			gen(STO, level - mk->level, mk->address);
 		}
 		else if (i&&table[i].kind == ID_QUOTEVARIABLE)
@@ -915,7 +917,8 @@ void block(symset fsys) //程序体
 		destroyset(set);
 	} while (inset(sym, declbegsys));
 
-	code[mk->address].a = cx;
+	code[mk->address].a = cx - 2 * num_quote;  //需要修改 cx 
+	num_quote = 0;
 	mk->address = cx;
 	cx0 = cx;
 	gen(INT, 0, block_dx);
@@ -1033,6 +1036,17 @@ void interpret()
 			stack[base(stack, b, i.l) + i.a] = stack[top];
 			printf("%d\n", stack[top]);
 			top--;
+			break;
+		case LEA:
+			stack[++top] = base(stack, b, i.l) + i.a;
+			break;
+		case LODA:
+			stack[++top] = stack[stack[top-1]];
+			break;
+		case STOA:
+			stack[stack[top-1]] = stack[top];
+			printf("%d\n", stack[top]);
+			top=top-2; 
 			break;
 		case CAL:
 			stack[top + 1] = base(stack, b, i.l);
