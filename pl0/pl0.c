@@ -1041,7 +1041,8 @@ void interpret()
 			stack[++top] = base(stack, b, i.l) + i.a;
 			break;
 		case LODA:
-			stack[++top] = stack[stack[top-1]];
+			stack[top+1] = stack[stack[top]];
+			top++;
 			break;
 		case STOA:
 			stack[stack[top-1]] = stack[top];
