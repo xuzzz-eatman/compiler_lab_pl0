@@ -33,8 +33,8 @@ void getch(void)
 		line[cc + 1] = ' ';
 		line[cc + 2] = ' ';
 		cc = ll;
-	} //添加行注释 by徐卓
-	if (cc == ll)
+	} //添加行注释 by
+	while (cc == ll)
 	{
 		if (feof(infile))
 		{
@@ -51,6 +51,12 @@ void getch(void)
 		} // while
 		printf("\n");
 		line[++ll] = ' ';
+		if (line[cc + 1] == '/' && line[cc + 2] == '/')
+		{
+			line[cc + 1] = ' ';
+			line[cc + 2] = ' ';
+			cc = ll;
+		} //添加行注释 by
 	}
 
 	ch = line[++cc];
