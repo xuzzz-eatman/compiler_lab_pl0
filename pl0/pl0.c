@@ -65,13 +65,13 @@ void getsym(void)
 
 	while (ch == ' ' || ch == '\t')
 		getch();
-	if (ch == '/'&& line[cc+1]=='*')
+	if (ch == '/' && line[cc + 1] == '*')
 	{ //处理块注释 by徐卓
 		getch();
 		if (ch == '*')
 		{
 			getch();
-			while (ch != '*'|| line[cc+1]!='/')
+			while (ch != '*' || line[cc + 1] != '/')
 			{
 				getch();
 			}
@@ -102,7 +102,13 @@ void getsym(void)
 			getch();
 			a[k] = 0;
 			strcpy(id, a);
-			sym = SYM_LABEL; //对label的识别 GOTO会使用到 modify by 徐卓
+			sym = SYM_LABEL; //对label的识别 GOTO会使用到
+		}
+		else if (ch == '[')
+		{
+			a[k] = 0;
+			strcpy(id, a);
+			sym = SYM_ARRAYIDENTIFIER; //
 		}
 		else
 		{
@@ -131,11 +137,12 @@ void getsym(void)
 		if (k > MAXNUMLEN)
 			error(25); // The number is too great.
 	}
-	else if (ch == '&' && line[cc+1] != '&')
+	else if (ch == '&' && line[cc + 1] != '&')
 	{
 		getch();
-		if(isalpha(ch))
-		{	// symbol is a REFERidentifier.
+		//exit(0);
+		if (isalpha(ch) && !in_procedure)
+		{ // symbol is a REFERidentifier.
 			k = 0;
 			do
 			{
@@ -143,7 +150,7 @@ void getsym(void)
 					a[k++] = ch;
 				getch();
 			} while (isalpha(ch) || isdigit(ch));
-			if(ch == '=')
+			if (ch == '='||ch == ' ')
 			{
 				a[k] = 0;
 				strcpy(id, a);
@@ -160,8 +167,39 @@ void getsym(void)
 			{
 				error(11);
 			}
-			
 		}
+		else if (isalpha(ch) && in_procedure)
+		{ //in procedure declaration
+			k = 0;
+			do
+			{
+				if (k < MAXIDLEN)
+					a[k++] = ch;
+				getch();
+			} while (isalpha(ch) || isdigit(ch));
+			a[k] = 0;
+			strcpy(id, a);
+			word[0] = id;
+			i = NRW;
+			while (strcmp(id, word[i--]))
+				;
+			if (++i)
+				error(11); // symbol is a reserved word  error
+			else
+				sym = SYM_REFERIDENTIFIER; // symbol is a REFERidentifier
+		}
+	}
+	else if (ch == '&' && line[cc + 1] == '&')
+	{
+		getch();
+		sym = SYM_AND; // &&
+		getch();
+	}
+	else if (ch == '|' && line[cc + 1] == '|')
+	{
+		getch();
+		sym = SYM_OR; // ||
+		getch();
 	}
 	else if (ch == ':')
 	{
@@ -292,11 +330,21 @@ void enter(int kind)
 	case ID_REFERVARIABLE:
 		mk = (mask *)&table[tx];
 		mk->level = level;
-		mk->address = dx++;	
-		break;	
-	}		   // switch
+		mk->address = dx++;
+		break;
+	case ID_ARRAY:
+		mk = (mask *)&table[tx];
+		mk->level = level;
+		mk->address = dx; //
+		dx = dx + total_wei;
+	} // switch
 } // enter
 
+void enter2()
+{
+	tx_a++;
+	strcpy(atable[tx_a].name, id);
+}
 //////////////////////////////////////////////////////////////////////
 // locates identifier in symbol table.
 int position(char *id)
@@ -309,6 +357,15 @@ int position(char *id)
 	return i;
 } // position   没找到为0
 
+int position2(char *id)
+{
+	int i;
+	strcpy(atable[0].name, id);
+	i = tx + 1;
+	while (strcmp(atable[--i].name, id) != 0)
+		;
+	return i;
+} // position   没找到为0
 //////////////////////////////////////////////////////////////////////
 //常值变量声明
 void constdeclaration()
@@ -350,26 +407,133 @@ void vardeclaration(void)
 		enter(ID_VARIABLE);
 		getsym();
 	}
-	else if(sym == SYM_REFERIDENTIFIER)
+	else if (sym == SYM_REFERIDENTIFIER)
 	{
-		int i;
+		int i, j, k;
 		mask *mk;
 		enter(ID_REFERVARIABLE);
-		getch();
-		getsym(); 
-		if(!(i = position(id)))
+		getsym();
+		getsym();
+		if (!(i = position(id)))
 		{
-			error(11);  //引用的变量未声明
+			error(11); //引用的变量未声明
 		}
-		else
+		else if (sym == SYM_IDENTIFIER)
 		{
-			mk=(mask *)&table[i];
-			gen(LEA,level,mk->address);
-			mk=(mask *)&table[tx];
-			gen(STO,level,mk->address);
+
+			mk = (mask *)&table[i];
+			if(mk->kind == ID_VARIABLE){
+				gen(LEA, level, mk->address);
+			}
+				
+			else if (mk->kind == ID_REFERVARIABLE){
+				gen(LOD, level, mk->address);
+			}
+				
+			num_reference++;
+			mk = (mask *)&table[tx];
+			gen(STO, level, mk->address);
+			num_reference++;
+			getsym();
+		}
+		else if (sym == SYM_ARRAYIDENTIFIER)
+		{
+			j = position2(id);
+			mk = (mask *)&table[i];
+			gen(LEA, level - mk->level, mk->address);
+			num_reference++;
+			getsym();
+			dimen = 1;
+			getsym();
+
+			if (sym == SYM_NUMBER)
+			{
+				gen(LIT, 0, num);
+				num_reference++;
+			}
+			else if (sym == SYM_IDENTIFIER)
+			{
+				k = position(id);
+				gen(LIT, 0, table[k].value);
+				num_reference++;
+			}
+			getsym();
+			// gen(OPR, 0, OPR_ADD);
+			// num_reference++;
+			getsym();
+			if (sym == SYM_LBRAC)
+			{
+				gen(LIT, 0, atable[j].dimension[dimen++]);
+				num_reference++;
+				gen(OPR, 0, OPR_MUL);
+				num_reference++;
+			}
+
+			while (sym == SYM_LBRAC)
+			{
+				getsym();
+
+				if (sym == SYM_NUMBER)
+				{
+					gen(LIT, 0, num);
+					num_reference++;
+				}
+				else if (sym == SYM_IDENTIFIER)
+				{
+					k = position(id);
+					gen(LIT, 0, table[k].value);
+					num_reference++;
+				}
+
+				gen(OPR, 0, OPR_ADD);
+				num_reference++;
+				getsym();
+				if (sym == SYM_LBRAC)
+				{
+					gen(LIT, 0, atable[j].dimension[dimen++]);
+					num_reference++;
+					gen(OPR, 0, OPR_MUL);
+					num_reference++;
+				}
+			}
+			gen(OPR, 0, OPR_ADD);
+			num_reference++;
+			mk = (mask *)&table[tx];
+			gen(STO, level, mk->address);
 			num_reference++;
 		}
-		getsym(); 
+	}
+	else if (sym == SYM_ARRAYIDENTIFIER)
+	{
+		int posi;
+		enter2();
+		getsym();
+		dimen = 0;
+		strcpy(id_arr,id);
+		while (sym == SYM_LBRAC)
+		{
+			getsym();
+			if (sym == SYM_NUMBER)
+			{
+				atable[tx_a].dimension[dimen++] = num;
+				total_wei *= num;
+			}
+			else if (sym == SYM_IDENTIFIER)
+			{
+				
+				if ((posi = position(id)) && (table[posi].kind == ID_CONSTANT))
+				{
+					atable[tx_a].dimension[dimen++] = table[posi].value;
+					total_wei *= table[posi].value;
+				}
+			}
+			getsym();
+			getsym();
+		}
+		strcpy(id,id_arr);
+		enter(ID_ARRAY);
+		dimen = 0;
+		total_wei = 1;
 	}
 	else
 	{
@@ -395,10 +559,10 @@ void listcode(int from, int to)
 void factor(symset fsys)
 {
 	void expression(symset fsys);
-	int i;
+	int i, j;
 	symset set;
 
-	test(facbegsys, fsys, 24); // The symbol can not be as the beginning of an expression.
+	// test(facbegsys, fsys, 24); // The symbol can not be as the beginning of an expression.
 
 	if (inset(sym, facbegsys))
 	{
@@ -432,6 +596,52 @@ void factor(symset fsys)
 			}
 			getsym();
 		}
+		else if (sym == SYM_ARRAYIDENTIFIER)
+		{
+			mask *mk;
+			if (!(i = position(id)))
+			{
+				error(11); // Undeclared identifier.
+			}
+			else if (table[i].kind != ID_ARRAY)
+			{
+				error(12);
+				i = 0;
+			}
+			j = position2(id);
+			mk = (mask *)&table[i];
+			if (in_procedure)
+			{
+				gen(LOD, level - mk->level, mk->address);
+			}
+			else
+				gen(LEA, level - mk->level, mk->address);
+			getsym();
+			dimen = 1;
+			getsym();
+			expression(fsys);
+			getsym();
+			if (sym == SYM_LBRAC)
+			{
+				gen(LIT, 0, atable[j].dimension[dimen++]);
+				gen(OPR, 0, OPR_MUL);
+			}
+
+			while (sym == SYM_LBRAC)
+			{
+				getsym();
+				expression(fsys);
+				gen(OPR, 0, OPR_ADD);
+				getsym();
+				if (sym == SYM_LBRAC)
+				{
+					gen(LIT, 0, atable[j].dimension[dimen++]);
+					gen(OPR, 0, OPR_MUL);
+				}
+			}
+			gen(OPR, 0, OPR_ADD);
+			gen(LODA, 0, 0);
+		}
 		else if (sym == SYM_NUMBER)
 		{
 			if (num > MAXADDRESS)
@@ -441,6 +651,34 @@ void factor(symset fsys)
 			}
 			gen(LIT, 0, num);
 			getsym();
+		}
+		else if (sym == SYM_RND)
+		{
+			getsym();
+			if (sym != SYM_LPAREN)
+				error(38);
+			else
+			{
+				getsym();
+				if (sym == SYM_RPAREN)
+				{
+					gen(RND, 0, 0);
+					getsym();
+				}
+				else
+				{
+					set = uniteset(createset(SYM_RPAREN, SYM_NULL), fsys);
+					expression(set);
+					destroyset(set);
+					gen(RND, 0, 1);
+					if (sym == SYM_RPAREN)
+						getsym();
+					else
+					{
+						error(22);
+					}
+				}
+			}
 		}
 		else if (sym == SYM_LPAREN)
 		{
@@ -463,7 +701,13 @@ void factor(symset fsys)
 			factor(fsys);
 			gen(OPR, 0, OPR_NEG);
 		}
-		test(fsys, createset(SYM_LPAREN, SYM_NULL), 23);
+		else if (sym == SYM_NOT)
+		{
+			getsym();
+			factor(fsys);
+			gen(OPR, 0, OPR_NOT);
+		}
+		// test(fsys, createset(SYM_LPAREN,SYM_RBRAC, SYM_NULL), 23);
 	} // if
 } // factor
 
@@ -520,8 +764,9 @@ void expression(symset fsys)
 } // expression
 
 //////////////////////////////////////////////////////////////////////
-void condition(symset fsys)
+void and_condition(symset fsys)
 {
+	void condition(symset fsys);
 	int relop;
 	symset set;
 
@@ -531,6 +776,27 @@ void condition(symset fsys)
 		expression(fsys);
 		gen(OPR, 0, 6);
 	}
+	else if (sym == SYM_LPAREN)
+	{
+		getsym();
+		set = uniteset(createset(SYM_RPAREN, SYM_NULL), fsys);
+		condition(set);
+		destroyset(set);
+		if (sym == SYM_RPAREN)
+		{
+			getsym();
+		}
+		else
+		{
+			error(22); // Missing ')'.
+		}
+	}
+	else if (sym == SYM_NOT)
+	{
+		getsym();
+		condition(fsys);
+		gen(OPR, 0, OPR_NOT);
+	}
 	else
 	{
 		set = uniteset(relset, fsys);
@@ -539,6 +805,7 @@ void condition(symset fsys)
 		if (!inset(sym, relset))
 		{
 			error(20);
+			printf("%d\n", sym);
 		}
 		else
 		{
@@ -570,14 +837,322 @@ void condition(symset fsys)
 	}		  // else
 } // condition
 
+void or_condition(symset fsys)
+{
+	symset set;
+
+	set = uniteset(fsys, createset(SYM_AND, SYM_NULL));
+	and_condition(set);
+	while (sym == SYM_AND)
+	{
+		getsym();
+		and_condition(set);
+		gen(OPR, 0, OPR_AND);
+	} // while
+	destroyset(set);
+} // term
+
+void condition(symset fsys)
+{
+	symset set;
+
+	set = uniteset(fsys, createset(SYM_OR, SYM_NULL));
+
+	or_condition(set);
+	while (sym == SYM_OR)
+	{
+		getsym();
+		or_condition(set);
+		gen(OPR, 0, OPR_OR);
+	} // while
+
+	destroyset(set);
+}
+
+void call_procedure(int i)
+{
+	//mask *mk;
+	//mk = (mask *)&table[i];
+	//gen(CAL, level - mk->level, mk->address);
+	//printf("hhhhhhhh: %s\n", id);
+	ptr para = table[i].procedure_para;
+	getsym();
+	if (sym != SYM_LPAREN)
+		error(38);
+	else
+	{
+		int num = para->n; //number of parameters
+		int pos;
+		getsym();
+		while (sym != SYM_RPAREN && num--)
+		{
+			if (sym == SYM_IDENTIFIER)
+			{
+				if (!(pos = position(id)))
+				{
+					error(11); //undefined parameters
+					break;
+				}
+				else
+				{
+					if (para->kind[num] == ID_VARIABLE)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_VARIABLE){
+							gen(LOD, level - mk->level, mk->address);
+							getsym();
+						}
+							
+						else if (mk->kind == ID_ARRAY)
+						{
+							int j = position2(id);
+							gen(LEA, level - mk->level, mk->address);
+							getsym();
+							dimen = 1;
+							getsym();
+							symset s1 = createset(SYM_PERIOD, SYM_NULL);
+							symset s2 = uniteset(declbegsys, statbegsys);
+							symset set1 = createset(SYM_SEMICOLON, SYM_END, SYM_NULL, SYM_COMMA);
+							symset set2 = uniteset(s1, s2);
+							symset set3 = uniteset(set1, set2);
+							symset fsys = uniteset(set3, facbegsys);
+							expression(fsys);
+							getsym();
+							if (sym == SYM_LBRAC)
+							{
+								gen(LIT, 0, atable[j].dimension[dimen++]);
+								gen(OPR, 0, OPR_MUL);
+							}
+
+							while (sym == SYM_LBRAC)
+							{
+								getsym();
+								expression(fsys);
+								gen(OPR, 0, OPR_ADD);
+								getsym();
+								if (sym == SYM_LBRAC)
+								{
+									gen(LIT, 0, atable[j].dimension[dimen++]);
+									gen(OPR, 0, OPR_MUL);
+								}
+							}
+							gen(OPR, 0, OPR_ADD);
+							gen(LODA, 0, 0);
+							destroyset(set1);
+							destroyset(set2);
+							destroyset(s1);
+							destroyset(s2);
+							destroyset(fsys);
+						}
+					}
+					else if (para->kind[num] == ID_REFERVARIABLE)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_VARIABLE){
+							gen(LEA, level, mk->address);
+							getsym();
+						}
+
+						else if (mk->kind == ID_REFERVARIABLE){
+							gen(LOD, level, mk->address);
+							getsym();
+						}
+
+						else if (mk->kind == ID_ARRAY)
+						{
+							int j = position2(id);
+							gen(LEA, level - mk->level, mk->address);
+							getsym();
+							dimen = 1;
+							getsym();
+							symset fsys = createset(SYM_ARRAYIDENTIFIER, SYM_IDENTIFIER, SYM_RND, SYM_NOT, SYM_NUMBER, SYM_LPAREN, SYM_RBRAC, SYM_MINUS, SYM_NULL);
+							expression(fsys);
+							getsym();
+							if (sym == SYM_LBRAC)
+							{
+								gen(LIT, 0, atable[j].dimension[dimen++]);
+								gen(OPR, 0, OPR_MUL);
+							}
+
+							while (sym == SYM_LBRAC)
+							{
+								getsym();
+								expression(fsys);
+								gen(OPR, 0, OPR_ADD);
+								getsym();
+								if (sym == SYM_LBRAC)
+								{
+									gen(LIT, 0, atable[j].dimension[dimen++]);
+									gen(OPR, 0, OPR_MUL);
+								}
+							}
+							gen(OPR, 0, OPR_ADD);
+							destroyset(fsys);
+						}
+					}
+					else if (para->kind[num] == ID_ARRAY)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_ARRAY)
+							gen(LEA, level, mk->address);
+						getsym();
+					}
+				}
+			}
+			else if (sym == SYM_ARRAYIDENTIFIER) //read an array
+			{
+				if (!(pos = position(id)))
+				{
+					error(11); //undefined parameters
+					break;
+				}
+				else
+				{
+					if (para->kind[num] == ID_VARIABLE)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_ARRAY)
+						{
+							int j = position2(id);
+							gen(LEA, level - mk->level, mk->address);
+							getsym();
+							dimen = 1;
+							getsym();
+							symset s1 = createset(SYM_PERIOD, SYM_NULL);
+							symset s2 = uniteset(declbegsys, statbegsys);
+							symset set1 = createset(SYM_SEMICOLON, SYM_END, SYM_NULL, SYM_COMMA);
+							symset set2 = uniteset(s1, s2);
+							symset set3 = uniteset(set1, set2);
+							symset fsys = uniteset(set3, facbegsys);
+							expression(fsys);
+							getsym();
+							if (sym == SYM_LBRAC)
+							{
+								gen(LIT, 0, atable[j].dimension[dimen++]);
+								gen(OPR, 0, OPR_MUL);
+							}
+
+							while (sym == SYM_LBRAC)
+							{
+								getsym();
+								expression(fsys);
+								gen(OPR, 0, OPR_ADD);
+								getsym();
+								if (sym == SYM_LBRAC)
+								{
+									gen(LIT, 0, atable[j].dimension[dimen++]);
+									gen(OPR, 0, OPR_MUL);
+								}
+							}
+							gen(OPR, 0, OPR_ADD);
+							gen(LODA, 0, 0);
+							destroyset(set1);
+							destroyset(set2);
+							destroyset(s1);
+							destroyset(s2);
+							destroyset(fsys);
+						}
+					}
+					else if (para->kind[num] == ID_REFERVARIABLE)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_VARIABLE)
+							gen(LEA, level, mk->address);
+						else if (mk->kind == ID_REFERVARIABLE)
+							gen(LOD, level, mk->address);
+						else if (mk->kind == ID_ARRAY)
+						{
+							int j = position2(id);
+							gen(LEA, level - mk->level, mk->address);
+							getsym();
+							dimen = 1;
+							getsym();
+							symset fsys = createset(SYM_ARRAYIDENTIFIER, SYM_IDENTIFIER, SYM_RND, SYM_NOT, SYM_NUMBER, SYM_LPAREN, SYM_RBRAC, SYM_MINUS, SYM_NULL);
+							expression(fsys);
+							getsym();
+							if (sym == SYM_LBRAC)
+							{
+								gen(LIT, 0, atable[j].dimension[dimen++]);
+								gen(OPR, 0, OPR_MUL);
+							}
+
+							while (sym == SYM_LBRAC)
+							{
+								getsym();
+								expression(fsys);
+								gen(OPR, 0, OPR_ADD);
+								getsym();
+								if (sym == SYM_LBRAC)
+								{
+									gen(LIT, 0, atable[j].dimension[dimen++]);
+									gen(OPR, 0, OPR_MUL);
+								}
+							}
+							gen(OPR, 0, OPR_ADD);
+							destroyset(fsys);
+						}
+					}
+					else if (para->kind[num] == ID_ARRAY)
+					{
+						mask *mk;
+						mk = (mask *)&table[pos];
+						if (mk->kind == ID_ARRAY)
+							gen(LEA, level, mk->address);
+						getsym();
+					}
+				}
+			}
+
+			if (sym == SYM_COMMA)
+			{
+				getsym();
+			}
+		}
+		if (sym == SYM_RPAREN && num == 0)
+		{
+			mask *mk;
+			mk = (mask *)&table[i];
+			gen(CAL, level - mk->level, mk->address);
+		}
+		else if (num == 0)
+		{
+			error(41); //too many parameters
+		}
+		else if (sym == SYM_RPAREN)
+		{
+			error(42); //too few parameters
+		}
+	}
+}
 //////////////////////////////////////////////////////////////////////
 void statement(symset fsys)
 {
-	int i, cx1, cx2;
+	int i, j, cx1, cx2;
 	symset set1, set;
 	if (sym == SYM_LABEL)
 	{
-		enter(ID_LABEL);
+		if (!(i = position(id)))
+		{
+			enter(ID_LABEL);
+		}
+		else
+		{
+			if (code[table[i].value].f == JMP && code[table[i].value].a == -1)
+			{
+				code[table[i].value].a = cx;
+				table[i].value = cx; //修改之前的jmp的地址  GOTO by徐卓
+			}
+			else
+			{
+				error(36); //重复定义label by徐卓
+			}
+		}
+
 		getsym();
 		statement(fsys);
 	} //识别label by徐卓
@@ -604,19 +1179,76 @@ void statement(symset fsys)
 			error(13); // ':=' expected.
 		}
 		mk = (mask *)&table[i];
-		if(table[i].kind == ID_REFERVARIABLE)
-			gen(LOD,level - mk->level,mk->address);
+		if (table[i].kind == ID_REFERVARIABLE)
+			gen(LOD, level - mk->level, mk->address);
 		expression(fsys);
+
 		mk = (mask *)&table[i];
-		if (i&&table[i].kind == ID_VARIABLE)
-		{			
+
+		if (i && table[i].kind == ID_VARIABLE)
+		{
 			gen(STO, level - mk->level, mk->address);
 		}
-		else if (i&&table[i].kind == ID_REFERVARIABLE)
+		else if (i && table[i].kind == ID_REFERVARIABLE)
 		{
-			gen(STOA,0,0);
+			gen(STOA, 0, 0);
 		}
-		
+	}
+	else if (sym == SYM_ARRAYIDENTIFIER)
+	{
+		mask *mk;
+		if (!(i = position(id)))
+		{
+			error(11); // Undeclared identifier.
+		}
+		else if (table[i].kind != ID_ARRAY)
+		{
+			error(12);
+			i = 0;
+		}
+		j = position2(id);
+		mk = (mask *)&table[i];
+		if (in_procedure)
+		{
+			gen(LOD, level - mk->level, mk->address);
+		}
+		else
+			gen(LEA, level - mk->level, mk->address);
+
+		getsym();
+		dimen = 1;
+		getsym();
+		expression(fsys);
+		getsym();
+		if (sym == SYM_LBRAC)
+		{
+			gen(LIT, 0, atable[j].dimension[dimen++]);
+			gen(OPR, 0, OPR_MUL);
+		}
+
+		while (sym == SYM_LBRAC)
+		{
+			getsym();
+			expression(fsys);
+			gen(OPR, 0, OPR_ADD);
+			getsym();
+			if (sym == SYM_LBRAC)
+			{
+				gen(LIT, 0, atable[j].dimension[dimen++]);
+				gen(OPR, 0, OPR_MUL);
+			}
+		}
+		gen(OPR, 0, OPR_ADD);
+		if (sym == SYM_BECOMES)
+		{
+			getsym();
+		}
+		else
+		{
+			error(13); // ':=' expected.
+		}
+		expression(fsys);
+		gen(STOA, 0, 0);
 	}
 	else if (sym == SYM_CALL)
 	{ // procedure call
@@ -632,11 +1264,7 @@ void statement(symset fsys)
 				error(11); // Undeclared identifier.
 			}
 			else if (table[i].kind == ID_PROCEDURE)
-			{
-				mask *mk;
-				mk = (mask *)&table[i];
-				gen(CAL, level - mk->level, mk->address);
-			}
+				call_procedure(i);
 			else
 			{
 				error(15); // A constant or variable can not be called.
@@ -663,6 +1291,7 @@ void statement(symset fsys)
 		cx1 = cx;
 		gen(JPC, 0, 0);
 		statement(fsys);
+		getsym();
 		//填入JPC的地址
 		if (sym == SYM_ELSE) //else 添加 by徐卓
 		{
@@ -741,11 +1370,19 @@ void statement(symset fsys)
 		{
 			if (!(i = position(id)))
 			{
-				error(11); // Undeclared identifier or label.
+				enter(ID_LABEL);
+				gen(JMP, 0, -1); //先出现goto 后面才出现label暂时填-1,表示label未出现  by徐卓
 			}
 			else if (table[i].kind == ID_LABEL)
 			{
-				gen(JMP, 0, table[i].value);
+				if (code[table[i].value].f == JMP && code[table[i].value].a == -1)
+				{
+					code[table[i].value].a = cx;
+					table[i].value = cx;
+					gen(JMP, 0, -1); //依然未出现label 但之前出现了GOTO,使上一个GOTO到下一个GOTO by徐卓
+				}
+				else
+					gen(JMP, 0, table[i].value);
 			}
 			else
 			{
@@ -754,21 +1391,63 @@ void statement(symset fsys)
 			getsym();
 		}
 	}
+	else if (sym == SYM_PRT)
+	{
+		getsym();
+		if (sym != SYM_LPAREN)
+		{
+			error(38); //The procedure name must be followed by ()
+		}
+		else
+		{
+			getsym();
+			if (sym == SYM_RPAREN)
+			{
+				gen(PRT, 0, 0);
+				getsym();
+			}
+
+			else
+			{
+				set = uniteset(createset(SYM_RPAREN, SYM_COMMA, SYM_NULL), fsys);
+				expression(set);
+				destroyset(set);
+				gen(PRT, 0, 1);
+				while (sym == SYM_COMMA)
+				{
+					getsym();
+					set = uniteset(createset(SYM_RPAREN, SYM_COMMA, SYM_NULL), fsys);
+					expression(set);
+					destroyset(set);
+					gen(PRT, 0, 1);
+				}
+				if (sym != SYM_RPAREN)
+				{
+					error(22); //missing ')'
+				}
+				else
+				{
+					getsym();
+				}
+			}
+		}
+	}
+
 	test(fsys, phi, 19);
 } // statement
 
 //////////////////////////////////////////////////////////////////////
-void block(symset fsys) //程序体
-{
-	int cx0; // initial code index
+void block(symset fsys, int paranum) //程序体
+{									 //paranum 为当前程序体的参数个数
+	int cx0;						 // initial code index
 	mask *mk;
 	int block_dx;
-	int savedTx;
+	int savedTx, savedDx;
 	symset set1, set;
 
 	dx = 3;
 	block_dx = dx;
-	mk = (mask *)&table[tx];
+	mk = (mask *)&table[tx - paranum]; //the true procedure place
 	mk->address = cx;
 	gen(JMP, 0, 0);
 	if (level > MAXLEVEL)
@@ -822,13 +1501,15 @@ void block(symset fsys) //程序体
 		}			   // if
 		block_dx = dx; //save dx before handling procedure call!
 		while (sym == SYM_PROCEDURE)
-		{// procedure declarations
+		{					  // procedure declarations
+			int para_num = 0; //the number of parameters
 			if (in_procedure) //a nested procedure
 			{
 				error(37);
 				getsym();
 				//skip this nested procedure
-				while (sym != SYM_SEMICOLON )getsym();
+				while (sym != SYM_SEMICOLON)
+					getsym();
 				getsym();
 				break;
 			}
@@ -844,31 +1525,92 @@ void block(symset fsys) //程序体
 				error(4); // There must be an identifier to follow 'const', 'var', or 'procedure'.
 			}
 
-			level++;																			// modified by nanahka 17-11-20
+			level++;
 			savedTx = tx;
-			in_procedure = 1; //set mark=1 ,in procedure
+			int savedTx_a = tx_a;
+			ptr para;
+			in_procedure = 1;	   //set mark=1 ,in procedure
 			if (sym == SYM_LPAREN) //get parameters
 			{
+				savedDx = dx;
 				getsym();
-				while (sym!= SYM_RPAREN)//look for ')'
+				while (sym != SYM_RPAREN) //look for ')'
 				{
-					if (sym == SYM_IDENTIFIER)
+					enter2();
+					if (sym == SYM_VAR)
 					{
 						getsym();
+						para_num++;
+						//printf("%d,%s\n", para_num, id);
+						if (sym == SYM_IDENTIFIER)
+						{
+							enter(ID_VARIABLE);
+							getsym();
+						}
+						else if (sym == SYM_REFERIDENTIFIER)
+						{
+							enter(ID_REFERVARIABLE);
+							getsym();
+						}
+						else if (sym == SYM_ARRAYIDENTIFIER)
+						{
+							enter2();
+							getsym();
+							dimen = 0;
+							strcpy(id_arr,id);
+							while (sym == SYM_LBRAC)
+							{
+								getsym();
+								if (sym == SYM_NUMBER)
+								{
+									atable[tx_a].dimension[dimen++] = num;
+									total_wei *= num;
+								}
+								else if (sym == SYM_IDENTIFIER)
+								{
+									int posi;
+									if ((posi = position(id)) && table[posi].kind == ID_CONSTANT)
+									{
+										atable[tx_a].dimension[dimen++] = table[posi].value;
+										total_wei *= table[posi].value;
+									}
+								}
+								getsym();
+								getsym();
+							}
+							strcpy(id,id_arr);
+							enter(ID_ARRAY);
+							dimen = 0;
+							total_wei = 1;
+						}
 					}
 					else
 					{
-						error(39);//other reserved words
+						error(39); //other reserved words
 						getsym();
 					}
 					if (sym == SYM_COMMA)
 					{
 						getsym();
-						if(sym==SYM_RPAREN)
+						if (sym == SYM_RPAREN)
 						{
 							error(40);
 						}
 					}
+				}
+				if (para_num) //have parameters
+				{
+					mask *mk_p = (mask *)&table[tx - para_num];
+					para = (ptr)malloc(sizeof(prodedure_parameters));
+					para->n = para_num;
+					para->kind = (int *)malloc(para_num * sizeof(int));
+					mk_p->procedure_para = para;
+				}
+				for (int i = 0; i < para_num; i++)
+				{
+					mask *mk_p = (mask *)&table[tx - i];
+					mk_p->address = -1 - i;
+					para->kind[i] = mk_p->kind;
 				}
 				getsym();
 			}
@@ -876,6 +1618,7 @@ void block(symset fsys) //程序体
 			{
 				error(38);
 			}
+			dx = savedDx; //恢复dx的值
 
 			if (sym == SYM_SEMICOLON)
 			{
@@ -886,21 +1629,23 @@ void block(symset fsys) //程序体
 				error(5); // Missing ',' or ';'.
 			}
 
+			savedTx = tx; //record the last parameters' place
 			set1 = createset(SYM_SEMICOLON, SYM_NULL);
 			set = uniteset(set1, fsys);
-			block(set);
+			block(set, para_num);
 			destroyset(set1);
 			destroyset(set);
-			tx = savedTx;
+			tx = savedTx - para_num; //recover the tx to the definition of procedure
+			//printf("procedure %s %d\n", table[tx].name, para_num);
+			tx_a = savedTx_a; //recvoer the array table
 			level--;
-			in_procedure = 0; //set mark=0 ,out of procedure
 
 			if (sym == SYM_SEMICOLON)
 			{
 				getsym();
 				set1 = createset(SYM_IDENTIFIER, SYM_PROCEDURE, SYM_NULL);
 				set = uniteset(statbegsys, set1);
-				test(set, fsys, 6);
+				// test(set, fsys, 6);
 				destroyset(set1);
 				destroyset(set);
 			}
@@ -912,14 +1657,15 @@ void block(symset fsys) //程序体
 		dx = block_dx; //restore dx after handling procedure call!
 		set1 = createset(SYM_IDENTIFIER, SYM_NULL);
 		set = uniteset(statbegsys, set1);
-		test(set, declbegsys, 7);
+		// test(set, declbegsys, 7);
 		destroyset(set1);
 		destroyset(set);
 	} while (inset(sym, declbegsys));
 
-	code[mk->address].a = cx - 2 * num_reference;  //需要修改 cx 
+	code[mk->address].a = cx - num_reference; //需要修改 cx
 	num_reference = 0;
 	mk->address = cx;
+	//printf("procedure %s %d\n", mk->name, mk->address);
 	cx0 = cx;
 	gen(INT, 0, block_dx);
 	set1 = createset(SYM_SEMICOLON, SYM_END, SYM_NULL);
@@ -930,6 +1676,7 @@ void block(symset fsys) //程序体
 	gen(OPR, 0, OPR_RET); // return
 	test(fsys, phi, 8);	  // test for error: Follow the statement is an incorrect symbol.
 	listcode(cx0, cx);
+	in_procedure = 0; //out of procedure
 } // block
 
 //////////////////////////////////////////////////////////////////////
@@ -1027,6 +1774,17 @@ void interpret()
 				top--;
 				stack[top] = stack[top] <= stack[top + 1];
 				break;
+			case OPR_AND: //
+				top--;
+				stack[top] = stack[top] && stack[top + 1];
+				break;
+			case OPR_OR: //
+				top--;
+				stack[top] = stack[top] || stack[top + 1];
+				break;
+			case OPR_NOT: //
+				stack[top] = !stack[top];
+				break;
 			} // switch
 			break;
 		case LOD:
@@ -1034,20 +1792,19 @@ void interpret()
 			break;
 		case STO:
 			stack[base(stack, b, i.l) + i.a] = stack[top];
-			printf("%d\n", stack[top]);
+			//printf("%d\n", stack[top]);
 			top--;
 			break;
 		case LEA:
 			stack[++top] = base(stack, b, i.l) + i.a;
 			break;
 		case LODA:
-			stack[top+1] = stack[stack[top]];
-			top++;
+			stack[top] = stack[stack[top]];
 			break;
 		case STOA:
-			stack[stack[top-1]] = stack[top];
-			printf("%d\n", stack[top]);
-			top=top-2; 
+			stack[stack[top - 1]] = stack[top];
+			// printf("%d\n", stack[top]);
+			top = top - 2;
 			break;
 		case CAL:
 			stack[top + 1] = base(stack, b, i.l);
@@ -1067,6 +1824,22 @@ void interpret()
 			if (stack[top] == 0)
 				pc = i.a;
 			top--;
+			break;
+		case PRT: //
+			if (i.a == 0)
+				printf("\n");
+			else if (i.a == 1)
+			{
+				printf("%d ", stack[top--]);
+			}
+			break;
+		case RND: //
+			if (i.a == 0)
+				stack[++top] = rand();
+			else
+			{
+				stack[top] = rand() % stack[top];
+			}
 			break;
 		} // switch
 	} while (pc);
@@ -1095,8 +1868,8 @@ int main()
 
 	// create begin symbol sets
 	declbegsys = createset(SYM_CONST, SYM_VAR, SYM_PROCEDURE, SYM_NULL);
-	statbegsys = createset(SYM_BEGIN, SYM_CALL, SYM_IF, SYM_WHILE, SYM_GOTO, SYM_NULL); //添加了GOTO by 徐卓
-	facbegsys = createset(SYM_IDENTIFIER, SYM_NUMBER, SYM_LPAREN, SYM_MINUS, SYM_NULL);
+	statbegsys = createset(SYM_BEGIN, SYM_CALL, SYM_IF, SYM_WHILE, SYM_GOTO, SYM_PRT, SYM_NULL); //添加了GOTO by 徐卓
+	facbegsys = createset(SYM_ARRAYIDENTIFIER, SYM_IDENTIFIER, SYM_RND, SYM_NOT, SYM_NUMBER, SYM_LPAREN, SYM_RBRAC, SYM_MINUS, SYM_NULL);
 
 	err = cc = cx = ll = 0; // initialize global variables
 	ch = ' ';
@@ -1107,7 +1880,7 @@ int main()
 	set1 = createset(SYM_PERIOD, SYM_NULL);
 	set2 = uniteset(declbegsys, statbegsys);
 	set = uniteset(set1, set2);
-	block(set);
+	block(set, 0);
 	destroyset(set1);
 	destroyset(set2);
 	destroyset(set);
@@ -1126,11 +1899,12 @@ int main()
 			fwrite(&code[i], sizeof(instruction), 1, hbin);
 		fclose(hbin);
 	}
+
 	if (err == 0)
 		interpret();
 	else
 		printf("There are %d error(s) in PL/0 program.\n", err);
-	listcode(0, cx);
+	listcode(0, cx);	
 } // main
 
 //////////////////////////////////////////////////////////////////////
