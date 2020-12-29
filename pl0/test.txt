@@ -1,0 +1,5 @@
+var p,&q=p,&r=q;
+begin
+p:=10;
+print(q,p,r);
+end.

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
+#include<time.h>
 #include "PL0.h"
 #include "set.c"
 //tlllll2333
@@ -33,7 +33,7 @@ void getch(void)
 		line[cc + 1] = ' ';
 		line[cc + 2] = ' ';
 		cc = ll;
-	} //添加行注释 by
+	} //添加行注释
 	while (cc == ll)
 	{
 		if (feof(infile))
@@ -43,7 +43,7 @@ void getch(void)
 		}
 		ll = cc = 0;
 		printf("%5d  ", cx);
-		while ((!feof(infile)) // added & modified by alex 01-02-09
+		while ((!feof(infile)) 
 			   && ((ch = getc(infile)) != '\n'))
 		{
 			printf("%c", ch);
@@ -56,7 +56,7 @@ void getch(void)
 			line[cc + 1] = ' ';
 			line[cc + 2] = ' ';
 			cc = ll;
-		} //添加行注释 by
+		} //添加行注释
 	}
 
 	ch = line[++cc];
@@ -65,90 +65,43 @@ void getch(void)
 //////////////////////////////////////////////////////////////////////
 // gets a symbol from input stream.
 void getsym(void)
-{
-	int i, k;
-	char a[MAXIDLEN + 1];
+{	
+	if(ifelse==1)
+	{
+		ifelse=0;
+	}
+	else
+	{
+		int i, k;
+		char a[MAXIDLEN + 1];
 
-	while (ch == ' ' || ch == '\t')
-		getch();
-	if (ch == '/' && line[cc + 1] == '*')
-	{ //处理块注释 by徐卓
-		getch();
-		if (ch == '*')
-		{
+		while (ch == ' ' || ch == '\t')
 			getch();
-			while (ch != '*' || line[cc + 1] != '/')
+		if (ch == '/' && line[cc + 1] == '*')
+		{ //处理块注释 
+			getch();
+			if (ch == '*')
 			{
 				getch();
-			}
-			getch();
-			if (ch == '/')
+				while (ch != '*' || line[cc + 1] != '/')
+				{
+					getch();
+				}
 				getch();
+				if (ch == '/')
+					getch();
+				else
+					error(34);
+			}
 			else
-				error(34);
+			{
+				error(33);
+			}
 		}
-		else
-		{
-			error(33);
-		}
-	}
-	while (ch == ' ' || ch == '\t')
-		getch();
-	if (isalpha(ch))
-	{ // symbol is a reserved word or an identifier.
-		k = 0;
-		do
-		{
-			if (k < MAXIDLEN)
-				a[k++] = ch;
+		while (ch == ' ' || ch == '\t')
 			getch();
-		} while (isalpha(ch) || isdigit(ch));
-		if (ch == ':' && line[cc + 1] != '=')
-		{
-			getch();
-			a[k] = 0;
-			strcpy(id, a);
-			sym = SYM_LABEL; //对label的识别 GOTO会使用到
-		}
-		else if (ch == '[')
-		{
-			a[k] = 0;
-			strcpy(id, a);
-			sym = SYM_ARRAYIDENTIFIER; //
-		}
-		else
-		{
-			a[k] = 0;
-			strcpy(id, a);
-			word[0] = id;
-			i = NRW;
-			while (strcmp(id, word[i--]))
-				;
-			if (++i)
-				sym = wsym[i]; // symbol is a reserved word
-			else
-				sym = SYM_IDENTIFIER; // symbol is an identifier
-		}
-	}
-	else if (isdigit(ch))
-	{ // symbol is a number.
-		k = num = 0;
-		sym = SYM_NUMBER;
-		do
-		{
-			num = num * 10 + ch - '0';
-			k++;
-			getch();
-		} while (isdigit(ch));
-		if (k > MAXNUMLEN)
-			error(25); // The number is too great.
-	}
-	else if (ch == '&' && line[cc + 1] != '&')
-	{
-		getch();
-		//exit(0);
-		if (isalpha(ch) && !in_procedure)
-		{ // symbol is a REFERidentifier.
+		if (isalpha(ch))
+		{ // symbol is a reserved word or an identifier.
 			k = 0;
 			do
 			{
@@ -156,8 +109,86 @@ void getsym(void)
 					a[k++] = ch;
 				getch();
 			} while (isalpha(ch) || isdigit(ch));
-			if (ch == '='||ch == ' ')
+			if (ch == ':' && line[cc + 1] != '=')
 			{
+				getch();
+				a[k] = 0;
+				strcpy(id, a);
+				sym = SYM_LABEL; //对label的识别 GOTO会使用到
+			}
+			else if (ch == '[')
+			{
+				a[k] = 0;
+				strcpy(id, a);
+				sym = SYM_ARRAYIDENTIFIER; //
+			}
+			else
+			{
+				a[k] = 0;
+				strcpy(id, a);
+				word[0] = id;
+				i = NRW;
+				while (strcmp(id, word[i--]))
+					;
+				if (++i)
+					sym = wsym[i]; // symbol is a reserved word
+				else
+					sym = SYM_IDENTIFIER; // symbol is an identifier
+			}
+		}
+		else if (isdigit(ch))
+		{ // symbol is a number.
+			k = num = 0;
+			sym = SYM_NUMBER;
+			do
+			{
+				num = num * 10 + ch - '0';
+				k++;
+				getch();
+			} while (isdigit(ch));
+			if (k > MAXNUMLEN)
+				error(25); // The number is too great.
+		}
+		else if (ch == '&' && line[cc + 1] != '&')
+		{
+			getch();
+			//exit(0);
+			if (isalpha(ch) && !in_procedure)
+			{ // symbol is a REFERidentifier.
+				k = 0;
+				do
+				{
+					if (k < MAXIDLEN)
+						a[k++] = ch;
+					getch();
+				} while (isalpha(ch) || isdigit(ch));
+				if (ch == '='||ch == ' ')
+				{
+					a[k] = 0;
+					strcpy(id, a);
+					word[0] = id;
+					i = NRW;
+					while (strcmp(id, word[i--]))
+						;
+					if (++i)
+						error(11); // symbol is a reserved word  error
+					else
+						sym = SYM_REFERIDENTIFIER; // symbol is a REFERidentifier
+				}
+				else
+				{
+					error(11);
+				}
+			}
+			else if (isalpha(ch) && in_procedure)
+			{ //in procedure declaration
+				k = 0;
+				do
+				{
+					if (k < MAXIDLEN)
+						a[k++] = ch;
+					getch();
+				} while (isalpha(ch) || isdigit(ch));
 				a[k] = 0;
 				strcpy(id, a);
 				word[0] = id;
@@ -169,105 +200,83 @@ void getsym(void)
 				else
 					sym = SYM_REFERIDENTIFIER; // symbol is a REFERidentifier
 			}
-			else
-			{
-				error(11);
-			}
 		}
-		else if (isalpha(ch) && in_procedure)
-		{ //in procedure declaration
-			k = 0;
-			do
+		else if (ch == '&' && line[cc + 1] == '&')
+		{
+			getch();
+			sym = SYM_AND; // &&
+			getch();
+		}
+		else if (ch == '|' && line[cc + 1] == '|')
+		{
+			getch();
+			sym = SYM_OR; // ||
+			getch();
+		}
+		else if (ch == ':')
+		{
+			getch();
+			if (ch == '=')
 			{
-				if (k < MAXIDLEN)
-					a[k++] = ch;
+				sym = SYM_BECOMES; // :=
 				getch();
-			} while (isalpha(ch) || isdigit(ch));
-			a[k] = 0;
-			strcpy(id, a);
-			word[0] = id;
-			i = NRW;
-			while (strcmp(id, word[i--]))
-				;
-			if (++i)
-				error(11); // symbol is a reserved word  error
+			}
 			else
-				sym = SYM_REFERIDENTIFIER; // symbol is a REFERidentifier
-		}
-	}
-	else if (ch == '&' && line[cc + 1] == '&')
-	{
-		getch();
-		sym = SYM_AND; // &&
-		getch();
-	}
-	else if (ch == '|' && line[cc + 1] == '|')
-	{
-		getch();
-		sym = SYM_OR; // ||
-		getch();
-	}
-	else if (ch == ':')
-	{
-		getch();
-		if (ch == '=')
-		{
-			sym = SYM_BECOMES; // :=
-			getch();
-		}
-		else
-		{
-			sym = SYM_NULL; // illegal?
-		}
-	}
-	else if (ch == '>')
-	{
-		getch();
-		if (ch == '=')
-		{
-			sym = SYM_GEQ; // >=
-			getch();
-		}
-		else
-		{
-			sym = SYM_GTR; // >
-		}
-	}
-	else if (ch == '<')
-	{
-		getch();
-		if (ch == '=')
-		{
-			sym = SYM_LEQ; // <=
-			getch();
+			{
+				sym = SYM_NULL; // illegal?
+			}
 		}
 		else if (ch == '>')
 		{
-			sym = SYM_NEQ; // <>
 			getch();
+			if (ch == '=')
+			{
+				sym = SYM_GEQ; // >=
+				getch();
+			}
+			else
+			{
+				sym = SYM_GTR; // >
+			}
+		}
+		else if (ch == '<')
+		{
+			getch();
+			if (ch == '=')
+			{
+				sym = SYM_LEQ; // <=
+				getch();
+			}
+			else if (ch == '>')
+			{
+				sym = SYM_NEQ; // <>
+				getch();
+			}
+			else
+			{
+				sym = SYM_LES; // <
+			}
 		}
 		else
-		{
-			sym = SYM_LES; // <
+		{ // other tokens
+			i = NSYM;
+			csym[0] = ch;
+			while (csym[i--] != ch)
+				;
+			if (++i)
+			{
+				sym = ssym[i];
+				getch();
+			}
+			else
+			{
+				printf("Fatal Error: Unknown character.\n");
+				exit(1);
+			}
 		}
 	}
-	else
-	{ // other tokens
-		i = NSYM;
-		csym[0] = ch;
-		while (csym[i--] != ch)
-			;
-		if (++i)
-		{
-			sym = ssym[i];
-			getch();
-		}
-		else
-		{
-			printf("Fatal Error: Unknown character.\n");
-			exit(1);
-		}
-	}
+	
+	
 } // getsym
 
 //////////////////////////////////////////////////////////////////////
@@ -284,6 +293,28 @@ void gen(int x, int y, int z)
 	code[cx++].a = z;
 } // gen
 
+void pre_gen(int x, int y, int z)
+{
+	if (pre_cx > CXMAX)
+	{
+		printf("Fatal Error: Program too long.\n");
+		exit(1);
+	}
+	pre[pre_cx].f = x;
+	pre[pre_cx].l = y;
+	pre[pre_cx++].a = z;
+} // gen
+void pre_gen2(int x, int y, int z)
+{
+	if (pre_cx_p > CXMAX)
+	{
+		printf("Fatal Error: Program too long.\n");
+		exit(1);
+	}
+	pre_p[pre_cx_p].f = x;
+	pre_p[pre_cx_p].l = y;
+	pre_p[pre_cx_p++].a = z;
+} // gen
 //////////////////////////////////////////////////////////////////////
 // tests if error occurs and skips all symbols that do not belongs to s1 or s2.
 void test(symset s1, symset s2, int n)
@@ -332,7 +363,7 @@ void enter(int kind)
 		break;
 	case ID_LABEL:
 		table[tx].value = cx;
-		break; // 添加label类型的ID 为goto提供信息 徐卓
+		break; // 添加label类型的ID 为goto提供信息
 	case ID_REFERVARIABLE:
 		mk = (mask *)&table[tx];
 		mk->level = level;
@@ -413,101 +444,213 @@ void vardeclaration(void)
 		enter(ID_VARIABLE);
 		getsym();
 	}
-	else if (sym == SYM_REFERIDENTIFIER)
+	else if (sym == SYM_REFERIDENTIFIER)	//引用变量
 	{
 		int i, j, k;
 		mask *mk;
-		enter(ID_REFERVARIABLE);
-		getsym();
-		getsym();
-		if (!(i = position(id)))
+		enter(ID_REFERVARIABLE);	//引用变量加入变量表
+		getsym();					//获取 =
+		getsym();					//获取引用的变量
+		if(!in_procedure)
 		{
-			error(11); //引用的变量未声明
-		}
-		else if (sym == SYM_IDENTIFIER)
-		{
-
-			mk = (mask *)&table[i];
-			if(mk->kind == ID_VARIABLE){
-				gen(LEA, level, mk->address);
-			}
-				
-			else if (mk->kind == ID_REFERVARIABLE){
-				gen(LOD, level, mk->address);
-			}
-				
-			num_reference++;
-			mk = (mask *)&table[tx];
-			gen(STO, level, mk->address);
-			num_reference++;
-			getsym();
-		}
-		else if (sym == SYM_ARRAYIDENTIFIER)
-		{
-			j = position2(id);
-			mk = (mask *)&table[i];
-			gen(LEA, level - mk->level, mk->address);
-			num_reference++;
-			getsym();
-			dimen = 1;
-			getsym();
-
-			if (sym == SYM_NUMBER)
+			if (!(i = position(id)))
 			{
-				gen(LIT, 0, num);
-				num_reference++;
+				error(11); //引用的变量未声明
 			}
 			else if (sym == SYM_IDENTIFIER)
 			{
-				k = position(id);
-				gen(LIT, 0, table[k].value);
-				num_reference++;
-			}
-			getsym();
-			// gen(OPR, 0, OPR_ADD);
-			// num_reference++;
-			getsym();
-			if (sym == SYM_LBRAC)
-			{
-				gen(LIT, 0, atable[j].dimension[dimen++]);
-				num_reference++;
-				gen(OPR, 0, OPR_MUL);
-				num_reference++;
-			}
 
-			while (sym == SYM_LBRAC)
+				mk = (mask *)&table[i];
+				if(mk->kind == ID_VARIABLE){	//引用的变量是普通变量
+					pre_gen(LEA, level, mk->address);	
+				}
+					
+				else if (mk->kind == ID_REFERVARIABLE){  //引用的变量也是引用变量
+					pre_gen(LOD, level, mk->address);
+				}
+					
+				single_pre_cx++;
+				mk = (mask *)&table[tx];
+				pre_gen(STO, level, mk->address);	//将变量地址存到引用变量中
+				single_pre_cx++;
+				getsym();
+			}
+			else if (sym == SYM_ARRAYIDENTIFIER) //引用数组的元素
 			{
+				j = position2(id);
+				mk = (mask *)&table[i];
+				pre_gen(LEA, level - mk->level, mk->address);
+				single_pre_cx++;
+				getsym();
+				dimen = 1;
 				getsym();
 
 				if (sym == SYM_NUMBER)
 				{
-					gen(LIT, 0, num);
-					num_reference++;
+						pre_gen(LIT, 0, num);
+						single_pre_cx++;			
 				}
 				else if (sym == SYM_IDENTIFIER)
 				{
 					k = position(id);
-					gen(LIT, 0, table[k].value);
-					num_reference++;
+					pre_gen(LIT, 0, table[k].value);
+					single_pre_cx++;
 				}
-
-				gen(OPR, 0, OPR_ADD);
-				num_reference++;
+				getsym();
+				// gen(OPR, 0, OPR_ADD);
+				// num_reference++;
 				getsym();
 				if (sym == SYM_LBRAC)
 				{
-					gen(LIT, 0, atable[j].dimension[dimen++]);
-					num_reference++;
-					gen(OPR, 0, OPR_MUL);
-					num_reference++;
+					pre_gen(LIT, 0, atable[j].dimension[dimen++]);
+					single_pre_cx++;
+					pre_gen(OPR, 0, OPR_MUL);
+					single_pre_cx++;
 				}
+
+				while (sym == SYM_LBRAC)
+				{
+					getsym();
+
+					if (sym == SYM_NUMBER)
+					{
+						pre_gen(LIT, 0, num);
+						single_pre_cx++;
+					}
+					else if (sym == SYM_IDENTIFIER)
+					{
+						k = position(id);
+						pre_gen(LIT, 0, table[k].value);
+						single_pre_cx++;
+					}
+
+					pre_gen(OPR, 0, OPR_ADD);
+					single_pre_cx++;
+					getsym();
+					if (sym == SYM_LBRAC)
+					{
+						pre_gen(LIT, 0, atable[j].dimension[dimen++]);
+						single_pre_cx++;
+						pre_gen(OPR, 0, OPR_MUL);
+						single_pre_cx++;
+					}
+				}
+				pre_gen(OPR, 0, OPR_ADD);
+				single_pre_cx++;
+				mk = (mask *)&table[tx];
+				pre_gen(STO, level, mk->address);
+				single_pre_cx++;
 			}
-			gen(OPR, 0, OPR_ADD);
-			num_reference++;
-			mk = (mask *)&table[tx];
-			gen(STO, level, mk->address);
-			num_reference++;
 		}
+		else
+		{
+			if (!(i = position(id)))
+			{
+				error(11); //引用的变量未声明
+			}
+			else if (sym == SYM_IDENTIFIER)
+			{
+
+				mk = (mask *)&table[i];
+				if(mk->kind == ID_VARIABLE){	//引用的变量是普通变量
+					pre_gen2(LEA, level - mk->level, mk->address);	
+				}
+					
+				else if (mk->kind == ID_REFERVARIABLE){  //引用的变量也是引用变量
+					pre_gen2(LOD, level - mk->level, mk->address);
+				}
+					
+				single_pre_cx_p++;
+				mk = (mask *)&table[tx];
+				pre_gen2(STO, level - mk->level, mk->address);	//将变量地址存到引用变量中
+				single_pre_cx_p++;
+				getsym();
+			}
+			else if (sym == SYM_ARRAYIDENTIFIER) //引用数组的元素
+			{
+				j = position2(id);
+				mk = (mask *)&table[i];
+				pre_gen2(LOD, level - mk->level, mk->address);
+				single_pre_cx_p++;
+				getsym();
+				dimen = 1;
+				getsym();
+
+				if (sym == SYM_NUMBER)
+				{
+						pre_gen2(LIT, 0, num);
+						single_pre_cx_p++;			
+				}
+				else if (sym == SYM_IDENTIFIER)
+				{
+					
+					k = position(id);
+					mk = (mask *)&table[k];
+					if(mk->kind==ID_CONSTANT)
+						pre_gen2(LIT, 0, table[k].value);
+					else
+					{
+						pre_gen2(LOD, level - mk->level, mk->address );
+					}
+					
+					single_pre_cx_p++;
+				}
+				getsym();
+				// gen(OPR, 0, OPR_ADD);
+				// num_reference++;
+				getsym();
+				if (sym == SYM_LBRAC)
+				{
+					pre_gen2(LIT, 0, atable[j].dimension[dimen++]);
+					single_pre_cx_p++;
+					pre_gen2(OPR, 0, OPR_MUL);
+					single_pre_cx_p++;
+				}
+
+				while (sym == SYM_LBRAC)
+				{
+					getsym();
+
+					if (sym == SYM_NUMBER)
+					{
+						pre_gen2(LIT, 0, num);
+						single_pre_cx_p++;
+					}
+					else if (sym == SYM_IDENTIFIER)
+					{
+					
+						k = position(id);
+						mk = (mask *)&table[k];
+						if(mk->kind==ID_CONSTANT)
+							pre_gen2(LIT, 0, table[k].value);
+						else
+						{
+							pre_gen2(LOD, level - mk->level, mk->address );
+						}
+						
+						single_pre_cx_p++;
+					}
+
+					pre_gen2(OPR, 0, OPR_ADD);
+					single_pre_cx_p++;
+					getsym();
+					if (sym == SYM_LBRAC)
+					{
+						pre_gen2(LIT, 0, atable[j].dimension[dimen++]);
+						single_pre_cx_p++;
+						pre_gen2(OPR, 0, OPR_MUL);
+						single_pre_cx_p++;
+					}
+				}
+				pre_gen2(OPR, 0, OPR_ADD);
+				single_pre_cx_p++;
+				mk = (mask *)&table[tx];
+				pre_gen2(STO, level - mk->level, mk->address);
+				single_pre_cx_p++;
+			}
+		}
+		
+		
 	}
 	else if (sym == SYM_ARRAYIDENTIFIER)
 	{
@@ -519,7 +662,7 @@ void vardeclaration(void)
 		while (sym == SYM_LBRAC)
 		{
 			getsym();
-			if (sym == SYM_NUMBER)
+			if (sym == SYM_NUMBER) //在声明数组时，维度只能是数字或者const
 			{
 				atable[tx_a].dimension[dimen++] = num;
 				total_wei *= num;
@@ -537,7 +680,7 @@ void vardeclaration(void)
 			getsym();
 		}
 		strcpy(id,id_arr);
-		enter(ID_ARRAY);
+		enter(ID_ARRAY);  //获取完全信息后加入变量表  变量表的地址增加元素个数
 		dimen = 0;
 		total_wei = 1;
 	}
@@ -887,10 +1030,10 @@ void call_procedure(int i)
 		error(38);
 	else
 	{
-		int num = para->n; //number of parameters
+		int num_p = para->n; //number of parameters
 		int pos;
 		getsym();
-		while (sym != SYM_RPAREN && num--)
+		while (sym != SYM_RPAREN && num_p--)
 		{
 			if (sym == SYM_IDENTIFIER)
 			{
@@ -901,7 +1044,7 @@ void call_procedure(int i)
 				}
 				else
 				{
-					if (para->kind[num] == ID_VARIABLE)
+					if (para->kind[num_p] == ID_VARIABLE)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -952,7 +1095,7 @@ void call_procedure(int i)
 							destroyset(fsys);
 						}
 					}
-					else if (para->kind[num] == ID_REFERVARIABLE)
+					else if (para->kind[num_p] == ID_REFERVARIABLE)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -998,7 +1141,7 @@ void call_procedure(int i)
 							destroyset(fsys);
 						}
 					}
-					else if (para->kind[num] == ID_ARRAY)
+					else if (para->kind[num_p] == ID_ARRAY)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -1017,7 +1160,7 @@ void call_procedure(int i)
 				}
 				else
 				{
-					if (para->kind[num] == ID_VARIABLE)
+					if (para->kind[num_p] == ID_VARIABLE)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -1063,7 +1206,7 @@ void call_procedure(int i)
 							destroyset(fsys);
 						}
 					}
-					else if (para->kind[num] == ID_REFERVARIABLE)
+					else if (para->kind[num_p] == ID_REFERVARIABLE)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -1103,7 +1246,7 @@ void call_procedure(int i)
 							destroyset(fsys);
 						}
 					}
-					else if (para->kind[num] == ID_ARRAY)
+					else if (para->kind[num_p] == ID_ARRAY)
 					{
 						mask *mk;
 						mk = (mask *)&table[pos];
@@ -1113,19 +1256,22 @@ void call_procedure(int i)
 					}
 				}
 			}
-
+			else if(sym==SYM_NUMBER){
+				gen(LIT,0,num);
+				getsym();
+			}
 			if (sym == SYM_COMMA)
 			{
 				getsym();
 			}
 		}
-		if (sym == SYM_RPAREN && num == 0)
+		if (sym == SYM_RPAREN && num_p == 0)
 		{
 			mask *mk;
 			mk = (mask *)&table[i];
 			gen(CAL, level - mk->level, mk->address);
 		}
-		else if (num == 0)
+		else if (num_p == 0)
 		{
 			error(41); //too many parameters
 		}
@@ -1151,17 +1297,17 @@ void statement(symset fsys)
 			if (code[table[i].value].f == JMP && code[table[i].value].a == -1)
 			{
 				code[table[i].value].a = cx;
-				table[i].value = cx; //修改之前的jmp的地址  GOTO by徐卓
+				table[i].value = cx; //修改之前的jmp的地址  GOTO 
 			}
 			else
 			{
-				error(36); //重复定义label by徐卓
+				error(36); //重复定义label 
 			}
 		}
 
 		getsym();
 		statement(fsys);
-	} //识别label by徐卓
+	} //识别label 
 
 	else if (sym == SYM_IDENTIFIER)
 	{ // variable assignment
@@ -1299,8 +1445,9 @@ void statement(symset fsys)
 		statement(fsys);
 		getsym();
 		//填入JPC的地址
-		if (sym == SYM_ELSE) //else 添加 by徐卓
+		if (sym == SYM_ELSE) //else 添加 
 		{
+			
 			cx2 = cx;
 			gen(JMP, 0, 0);
 			code[cx1].a = cx;
@@ -1310,6 +1457,7 @@ void statement(symset fsys)
 		}
 		else
 		{
+			ifelse = 1;
 			code[cx1].a = cx;
 		} // 不存在else  即单独一个if then
 	}
@@ -1668,12 +1816,33 @@ void block(symset fsys, int paranum) //程序体
 		destroyset(set);
 	} while (inset(sym, declbegsys));
 
-	code[mk->address].a = cx - num_reference; //需要修改 cx
-	num_reference = 0;
+	code[mk->address].a = cx; //需要修改 cx
+
+
+
 	mk->address = cx;
 	//printf("procedure %s %d\n", mk->name, mk->address);
 	cx0 = cx;
 	gen(INT, 0, block_dx);
+
+	if(!in_procedure){
+		for(int q=pre_cx-single_pre_cx;q<pre_cx;q++){
+			gen(pre[q].f,pre[q].l,pre[q].a);
+		}
+		pre_cx-=single_pre_cx;
+		single_pre_cx=0;
+	}
+	else
+	{
+		
+		for(int q=pre_cx_p-single_pre_cx_p;q<pre_cx_p;q++){
+			gen(pre_p[q].f,pre_p[q].l,pre_p[q].a);
+		}
+		pre_cx_p-=single_pre_cx_p;
+		single_pre_cx_p=0;
+	}
+	
+
 	set1 = createset(SYM_SEMICOLON, SYM_END, SYM_NULL);
 	set = uniteset(set1, fsys);
 	statement(set);
@@ -1850,7 +2019,7 @@ void interpret()
 		} // switch
 	} while (pc);
 
-	printf("End executing PL/0 program.\n");
+	printf("\nEnd executing PL/0 program.\n");
 } // interpret
 
 //////////////////////////////////////////////////////////////////////
@@ -1860,7 +2029,7 @@ int main()
 	char s[80];
 	int i;
 	symset set, set1, set2;
-
+	srand((unsigned)time(NULL));
 	printf("Please input source file name: "); // get file name to be compiled
 	scanf("%s", s);
 	if ((infile = fopen(s, "r")) == NULL)
@@ -1910,7 +2079,7 @@ int main()
 		interpret();
 	else
 		printf("There are %d error(s) in PL/0 program.\n", err);
-	listcode(0, cx);	
+	listcode(0, cx);		
 } // main
 
 //////////////////////////////////////////////////////////////////////

@@ -186,6 +186,11 @@ int num_reference = 0; //引用变量数
 int in_procedure = 0;  //in a procedure or not
 char line[80];
 int soa; //数组的大小
+int ifelse=0;
+int pre_cx=0;
+int single_pre_cx=0;
+int pre_cx_p=0;
+int single_pre_cx_p=0;
 instruction code[CXMAX];
 
 char *word[NRW + 1] =
@@ -232,17 +237,24 @@ typedef struct
 
 typedef struct
 {
-	char name[MAXIDLEN + 1];
-	int dimension[10];
+	char name[MAXIDLEN + 1];	//数组名
+	int dimension[10];			//数组维度信息
 } array;
 
 array atable[TXMAX];
 comtab table[TXMAX];
-
+typedef struct 
+{
+	int f; // function code
+	int l; // level
+	int a; // displacement address
+}pre_instruct;
+pre_instruct pre[TXMAX];
+pre_instruct pre_p[TXMAX];
 typedef struct
 {
 	char name[MAXIDLEN + 1];
-	int kind;
+	int kind;					
 	short level;
 	short address;
 	ptr procedure_para;

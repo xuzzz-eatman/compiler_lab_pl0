@@ -1,0 +1,17 @@
+const N = 50;
+
+var i,a[N];
+
+procedure f(var i,var a[N]);
+var &ri = a[i];
+begin
+	 ri := 100;
+end;
+
+
+begin
+    i := 10;
+    call f(10,a);
+    print(a[i]);
+end.
+
